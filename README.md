@@ -38,8 +38,8 @@ OCI uses API key-based authentication instead of username/password for CLI and T
 
 1. Click the **Profile** icon (top-right) → **Identity domain: Default**.
 2. In the left sidebar click **My profile**.
-3. Scroll down to **API keys** in the left menu and click it.
-3. Click **Add API key**.
+3. Click the **Tokens and keys** tab.
+4. Click **Add API key**.
 4. Select **Generate API key pair**.
 5. Click **Download private key** — save the `.pem` file as `~/.oci/oci_api_key.pem`.
 6. Click **Add**.

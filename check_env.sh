@@ -29,8 +29,7 @@ if [ -z "${OCI_COMPARTMENT_ID:-}" ]; then
     echo "ERROR: OCI_COMPARTMENT_ID is not set and tenancy could not be read from ~/.oci/config."
     exit 1
   fi
-  export OCI_COMPARTMENT_ID="$tenancy"
-  echo "WARNING: OCI_COMPARTMENT_ID not set — using tenancy OCID from ~/.oci/config as root compartment."
+  echo "WARNING: OCI_COMPARTMENT_ID not set — will use tenancy OCID from ~/.oci/config as root compartment."
 else
   echo "NOTE: OCI_COMPARTMENT_ID is set."
 fi

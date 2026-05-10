@@ -26,13 +26,7 @@ The [check_env](./check_env.sh) script validates this when you run the build.
 
 You need an OCI account. The [OCI Free Tier](https://www.oracle.com/cloud/free/) (Always Free) works fine for this example.
 
-### 1. Find Your Tenancy OCID
-
-1. Log into the [OCI Console](https://cloud.oracle.com).
-2. Click the **Profile** icon (top-right) → **Tenancy**.
-3. Copy the **OCID** shown on the Tenancy detail page. Save it — you will need it later.
-
-### 2. Create an API Signing Key
+### 1. Create an API Signing Key
 
 OCI uses API key-based authentication instead of username/password for CLI and Terraform access.
 
@@ -54,7 +48,7 @@ region=us-ashburn-1
 key_file=~/.oci/oci_api_key.pem
 ```
 
-### 3. Configure the OCI CLI
+### 2. Configure the OCI CLI
 
 Create the config directory and paste the snippet:
 
@@ -79,7 +73,7 @@ oci os ns get
 
 You should see your Object Storage namespace returned as JSON. If this fails, double-check the `key_file` path in `~/.oci/config` and that the private key file exists there.
 
-### 4. Get Your Compartment OCID
+### 3. Get Your Compartment OCID
 
 Everything in OCI lives in a **compartment**. The root compartment is your tenancy itself. For this example you can use the root compartment OCID (same as your Tenancy OCID from step 1), or create a dedicated compartment:
 
@@ -92,7 +86,7 @@ Your compartment OCID is the same as your Tenancy OCID copied in step 1.
 3. Give it a name (e.g., `terraform-demo`) and click **Create**.
 4. Click the new compartment and copy its **OCID**.
 
-### 5. Set the Compartment OCID Environment Variable
+### 4. Set the Compartment OCID Environment Variable
 
 ```bash
 export OCI_COMPARTMENT_ID="ocid1.compartment.oc1..aaaa..."

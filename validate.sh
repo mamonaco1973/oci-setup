@@ -24,8 +24,8 @@ for attempt in {1..24}; do
     echo "ERROR: Apache did not respond after 24 attempts (4 minutes)."
     exit 1
   fi
-  echo "NOTE: Not ready (attempt ${attempt}/24), retrying in 10 seconds..."
-  sleep 10
+  echo "NOTE: Not ready (attempt ${attempt}/24), retrying in 30 seconds..."
+  sleep 30
 done
 
 # ================================================================================

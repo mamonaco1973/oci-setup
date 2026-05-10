@@ -1,8 +1,10 @@
 #!/bin/bash
 
-# Pretty basic userdata script - install apache2 and enable it
+# OCI fires cloud-init before DNS resolves — wait until apt repos are reachable
+until apt-get update -y > /dev/null 2>&1; do
+  sleep 5
+done
 
-sudo apt update -y
-sudo apt install apache2 -y
-sudo systemctl enable apache2
-sudo systemctl start apache2
+apt-get install -y apache2
+systemctl enable apache2
+systemctl start apache2

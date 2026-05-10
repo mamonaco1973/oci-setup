@@ -36,8 +36,9 @@ You need an OCI account. The [OCI Free Tier](https://www.oracle.com/cloud/free/)
 
 OCI uses API key-based authentication instead of username/password for CLI and Terraform access.
 
-1. Click the **Profile** icon (top-right) → click your **email address** at the top of the dropdown.
-2. Scroll down to **API keys** in the left menu and click it.
+1. Click the **Profile** icon (top-right) → **Identity domain: Default**.
+2. In the left sidebar click **My profile**.
+3. Scroll down to **API keys** in the left menu and click it.
 3. Click **Add API key**.
 4. Select **Generate API key pair**.
 5. Click **Download private key** — save the `.pem` file as `~/.oci/oci_api_key.pem`.

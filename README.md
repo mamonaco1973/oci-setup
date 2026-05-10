@@ -94,17 +94,6 @@ export OCI_COMPARTMENT_ID="ocid1.compartment.oc1..aaaa..."
 
 Add this to your shell profile (`.bashrc` or `.zshrc`) to make it permanent. The apply and destroy scripts translate this into the `TF_VAR_compartment_ocid` name that Terraform expects.
 
-## Generate SSH Keys
-
-The instance is accessed via SSH key pair. Generate a new pair into the `keys/` directory:
-
-```bash
-ssh-keygen -t rsa -b 2048 -f ./keys/Private_Key -N ""
-cp ./keys/Private_Key.pub ./keys/Public_Key
-```
-
-The public key is injected into the instance at launch. The private key stays local for SSH access.
-
 ## Run the "apply" Script
 
 ```bash

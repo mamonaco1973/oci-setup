@@ -14,3 +14,5 @@ export TF_VAR_compartment_ocid="$OCI_COMPARTMENT_ID"
 
 terraform init
 terraform apply -auto-approve
+
+./validate.sh

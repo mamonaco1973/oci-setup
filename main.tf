@@ -9,6 +9,14 @@ terraform {
       source  = "oracle/oci"
       version = "~> 6.0"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.0"
+    }
   }
 }
 
@@ -18,6 +26,23 @@ provider "oci" {
 
 variable "compartment_ocid" {
   description = "OCID of the compartment to deploy resources into"
+}
+
+# ================================================================================
+# SSH Key Pair
+# Generated fresh each deploy — private key written to keys/ (gitignored)
+# ECDSA P-256 is smaller and faster than RSA while being equally secure
+# ================================================================================
+
+resource "tls_private_key" "ssh" {
+  algorithm   = "ECDSA"
+  ecdsa_curve = "P256"
+}
+
+resource "local_file" "private_key" {
+  content         = tls_private_key.ssh.private_key_openssh
+  filename        = "./keys/Private_Key"
+  file_permission = "0600"
 }
 
 # ================================================================================
@@ -139,7 +164,7 @@ resource "oci_core_instance" "setup_instance" {
   }
 
   metadata = {
-    ssh_authorized_keys = file("./keys/Public_Key")
+    ssh_authorized_keys = tls_private_key.ssh.public_key_openssh
     # user_data must be base64-encoded — cloud-init decodes it on first boot
     user_data           = base64encode(file("./scripts/userdata.sh"))
   }

@@ -45,8 +45,4 @@ Security List attaches at the **subnet** level (not instance level like AWS Secu
 
 ## Keys
 
-Generate before first apply — Terraform reads the public key at plan time:
-```bash
-ssh-keygen -t rsa -b 2048 -f ./keys/Private_Key -N ""
-cp ./keys/Private_Key.pub ./keys/Public_Key
-```
+Terraform generates an ECDSA P-256 key pair via `tls_private_key` on each fresh deploy. The private key is written to `keys/Private_Key` (0600) via `local_file`. The `keys/` directory is gitignored — keys are never committed. No manual key generation needed.

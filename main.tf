@@ -1,121 +1,155 @@
+# ================================================================================
 # Provider Configuration
-provider "aws" {
-  region = "us-east-2"  # AWS region where resources will be created
-}
+# Auth is read from ~/.oci/config DEFAULT profile — no credentials in code
+# ================================================================================
 
-# VPC Configuration
-resource "aws_vpc" "setup_vpc" {
-  cidr_block = "10.0.0.0/16"  # IP range for the VPC
-  tags = {
-    Name = "setup-vpc"        # Tag to identify the VPC
+terraform {
+  required_providers {
+    oci = {
+      source  = "oracle/oci"
+      version = "~> 6.0"
+    }
   }
 }
 
-# Internet Gateway
-resource "aws_internet_gateway" "setup_igw" {
-  vpc_id = aws_vpc.setup_vpc.id      # Attach to the created VPC
-  tags = {
-    Name = "setup-internet-gateway"  # Tag to identify the Internet Gateway
+provider "oci" {
+  region = "us-ashburn-1"
+}
+
+variable "compartment_ocid" {
+  description = "OCID of the compartment to deploy resources into"
+}
+
+# ================================================================================
+# Availability Domain
+# OCI requires explicit AD selection — resolved dynamically so this works
+# across regions with different numbers of availability domains
+# ================================================================================
+
+data "oci_identity_availability_domains" "ads" {
+  compartment_id = var.compartment_ocid
+}
+
+# ================================================================================
+# Networking
+# VCN → Internet Gateway → Route Table → Security List → Subnet
+# OCI has no implicit default network — every component must be created
+# ================================================================================
+
+resource "oci_core_vcn" "setup_vcn" {
+  compartment_id = var.compartment_ocid
+  cidr_block     = "10.0.0.0/16"
+  display_name   = "setup-vcn"
+  # dns_label must be alphanumeric and ≤ 15 chars — forms the VCN's DNS domain
+  dns_label      = "setupvcn"
+}
+
+resource "oci_core_internet_gateway" "setup_igw" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.setup_vcn.id
+  display_name   = "setup-igw"
+  enabled        = true
+}
+
+resource "oci_core_route_table" "setup_rt" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.setup_vcn.id
+  display_name   = "setup-route-table"
+
+  route_rules {
+    destination       = "0.0.0.0/0"
+    destination_type  = "CIDR_BLOCK"
+    network_entity_id = oci_core_internet_gateway.setup_igw.id
   }
 }
 
-# Route Table Configuration
-resource "aws_route_table" "setup_route_table" {
-  vpc_id = aws_vpc.setup_vpc.id                     # Associate with the created VPC
+# Security List attaches at the subnet level — unlike AWS Security Groups
+# which attach to instances. All instances in the subnet share these rules.
+resource "oci_core_security_list" "setup_sl" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.setup_vcn.id
+  display_name   = "setup-security-list"
 
-  route {
-    cidr_block = "0.0.0.0/0"                        # Allow all outbound traffic
-    gateway_id = aws_internet_gateway.setup_igw.id  # Route traffic to the Internet Gateway
+  ingress_security_rules {
+    protocol  = "6"           # 6 = TCP
+    source    = "0.0.0.0/0"
+    stateless = false
+    tcp_options {
+      min = 22
+      max = 22
+    }
   }
 
-  tags = {
-    Name = "setup-route-table"                      # Tag to identify the Route Table
-  }
-}
-
-# Route Table Association
-resource "aws_route_table_association" "setup_route_table_assoc" {
-  subnet_id      = aws_subnet.setup_public_subnet.id     # Associate with the public subnet
-  route_table_id = aws_route_table.setup_route_table.id  # Use the created Route Table
-}
-
-# Public Subnet Configuration
-resource "aws_subnet" "setup_public_subnet" {
-  vpc_id                  = aws_vpc.setup_vpc.id  # Associate with the created VPC
-  cidr_block              = "10.0.1.0/24"         # IP range for the subnet
-  map_public_ip_on_launch = true                  # Enable public IPs for launched instances
-  availability_zone       = "us-east-2a"          # Specify the availability zone
-  tags = {
-    Name = "setup-public-subnet"                  # Tag to identify the subnet
-  }
-}
-
-# Security Group
-resource "aws_security_group" "setup_sg" {
-  vpc_id = aws_vpc.setup_vpc.id  # Associate with the created VPC
-
-  ingress {
-    from_port   = 22               # SSH port
-    to_port     = 22               # SSH port
-    protocol    = "tcp"            # Protocol type
-    cidr_blocks = ["0.0.0.0/0"]    # Open to all for SSH
+  ingress_security_rules {
+    protocol  = "6"           # 6 = TCP
+    source    = "0.0.0.0/0"
+    stateless = false
+    tcp_options {
+      min = 80
+      max = 80
+    }
   }
 
-  ingress {
-    from_port   = 80               # HTTP port
-    to_port     = 80               # HTTP port
-    protocol    = "tcp"            # Protocol type
-    cidr_blocks = ["0.0.0.0/0"]    # Open to all for HTTP
-  }
-
-  egress {
-    from_port   = 0                # All outbound ports
-    to_port     = 0                # All outbound ports
-    protocol    = "-1"             # Allow all protocols
-    cidr_blocks = ["0.0.0.0/0"]    # Allow all outbound traffic
-  }
-
-  tags = {
-    Name = "setup-security-group"  # Tag to identify the security group
+  egress_security_rules {
+    protocol    = "all"
+    destination = "0.0.0.0/0"
+    stateless   = false
   }
 }
 
-# Key Pair Configuration
-resource "aws_key_pair" "setup_key_pair" {
-  key_name   = "setup-key-pair"           # Key pair name
-  public_key = file("./keys/Public_Key")  # Path to the public key file
+resource "oci_core_subnet" "setup_subnet" {
+  compartment_id    = var.compartment_ocid
+  vcn_id            = oci_core_vcn.setup_vcn.id
+  cidr_block        = "10.0.1.0/24"
+  display_name      = "setup-subnet"
+  dns_label         = "setupsubnet"
+  route_table_id    = oci_core_route_table.setup_rt.id
+  security_list_ids = [oci_core_security_list.setup_sl.id]
 }
 
-# AMI Data Source
-data "aws_ami" "setup_ubuntu" {
-  most_recent = true                    # Fetch the most recent AMI
-  owners      = ["099720109477"]        # Canonical's AWS Account ID
+# ================================================================================
+# Compute
+# VM.Standard.E2.1.Micro is always-free eligible — 1 OCPU, 1 GB RAM
+# Ubuntu image resolved dynamically from Oracle's image catalog
+# ================================================================================
 
-  filter {
-    name   = "name"                           # Filter AMIs by name
-    values = ["*ubuntu-noble-24.04-amd64-*"]  # Match Ubuntu AMI
+data "oci_core_images" "ubuntu" {
+  compartment_id           = var.compartment_ocid
+  operating_system         = "Canonical Ubuntu"
+  operating_system_version = "24.04"
+  shape                    = "VM.Standard.E2.1.Micro"
+  sort_by                  = "TIMECREATED"
+  sort_order               = "DESC"
+}
+
+resource "oci_core_instance" "setup_instance" {
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  compartment_id      = var.compartment_ocid
+  shape               = "VM.Standard.E2.1.Micro"
+  display_name        = "setup-instance"
+
+  source_details {
+    source_type = "image"
+    source_id   = data.oci_core_images.ubuntu.images[0].id
+  }
+
+  create_vnic_details {
+    subnet_id        = oci_core_subnet.setup_subnet.id
+    assign_public_ip = true
+  }
+
+  metadata = {
+    ssh_authorized_keys = file("./keys/Public_Key")
+    # user_data must be base64-encoded — cloud-init decodes it on first boot
+    user_data           = base64encode(file("./scripts/userdata.sh"))
   }
 }
 
-# EC2 Instance Configuration
-resource "aws_instance" "setup_ec2_instance" {
-  ami                      = data.aws_ami.setup_ubuntu.id          # Use the selected AMI
-  instance_type            = "t2.micro"                            # Instance type
-  subnet_id                = aws_subnet.setup_public_subnet.id     # Launch in the public subnet
-  security_groups          = [aws_security_group.setup_sg.id]      # Apply the security group
-  associate_public_ip_address = true                               # Enable public IP assignment
+# ================================================================================
+# Outputs
+# ================================================================================
 
-  key_name = aws_key_pair.setup_key_pair.key_name                  # Use the created key pair
-
-  user_data = file("./scripts/userdata.sh")                        # Bootstrap script to initialize instance
-
-  tags = {
-    Name = "setup-ec2-instance"                                    # Tag to identify the EC2 instance
-  }
-}
-
-# Output Configuration
-output "setup_ec2_public_ip" {
-  value       = aws_instance.setup_ec2_instance.public_ip    # Output the instance's public IP
-  description = "The public IP address of the EC2 instance"  # Description of the output
+output "instance_public_ip" {
+  value       = oci_core_instance.setup_instance.public_ip
+  description = "The public IP address of the OCI compute instance"
 }

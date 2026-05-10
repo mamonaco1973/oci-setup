@@ -36,7 +36,7 @@ You need an OCI account. The [OCI Free Tier](https://www.oracle.com/cloud/free/)
 
 OCI uses API key-based authentication instead of username/password for CLI and Terraform access.
 
-1. Click the **Profile** icon (top-right) → **My profile**.
+1. Click the **Profile** icon (top-right) → click your **email address** at the top of the dropdown.
 2. Scroll down to **API keys** in the left menu and click it.
 3. Click **Add API key**.
 4. Select **Generate API key pair**.
@@ -93,19 +93,11 @@ Your compartment OCID is the same as your Tenancy OCID copied in step 1.
 
 ### 5. Set the Compartment OCID Environment Variable
 
-Terraform reads this variable automatically via the `TF_VAR_` prefix convention.
-
-**Bash:**
 ```bash
-export TF_VAR_compartment_ocid="ocid1.compartment.oc1..aaaa..."
+export OCI_COMPARTMENT_ID="ocid1.compartment.oc1..aaaa..."
 ```
 
-**PowerShell:**
-```powershell
-$env:TF_VAR_compartment_ocid = "ocid1.compartment.oc1..aaaa..."
-```
-
-Add this to your shell profile (`.bashrc`, `.zshrc`, or PowerShell `$PROFILE`) to make it permanent.
+Add this to your shell profile (`.bashrc` or `.zshrc`) to make it permanent. The apply and destroy scripts translate this into the `TF_VAR_compartment_ocid` name that Terraform expects.
 
 ## Generate SSH Keys
 

@@ -21,13 +21,12 @@ else
   exit 1
 fi
 
-# TF_VAR_compartment_ocid is read by Terraform as var.compartment_ocid
-echo "NOTE: Checking TF_VAR_compartment_ocid environment variable."
-if [ -z "${TF_VAR_compartment_ocid:-}" ]; then
-  echo "ERROR: TF_VAR_compartment_ocid is not set."
+echo "NOTE: Checking OCI_COMPARTMENT_ID environment variable."
+if [ -z "${OCI_COMPARTMENT_ID:-}" ]; then
+  echo "ERROR: OCI_COMPARTMENT_ID is not set."
   exit 1
 else
-  echo "NOTE: TF_VAR_compartment_ocid is set."
+  echo "NOTE: OCI_COMPARTMENT_ID is set."
 fi
 
 echo "NOTE: Checking OCI CLI connection."

@@ -5,6 +5,10 @@ This project is a companion to a video on my channel on how to configure Terrafo
 
 The Terraform in this project creates a minimal VCN with one public subnet, a security list allowing SSH and HTTP, and a compute instance running Ubuntu 24.04. A [cloud-init script](scripts/userdata.sh) installs Apache when the instance boots.
 
+See it in action — full deployment walkthrough below.
+
+[![Watch the video](https://img.youtube.com/vi/yu190JktZr0/maxresdefault.jpg)](https://www.youtube.com/watch?v=yu190JktZr0)
+
 ## Download this Repository
 
 ```bash

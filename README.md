@@ -1,143 +1,118 @@
-OCI Terraform Setup Instructions
-=========================================
+# OCI + Terraform Setup
 
-This project is a companion to a video on my channel on how to configure Terraform with Oracle Cloud Infrastructure (OCI).
-
-The Terraform in this project creates a minimal VCN with one public subnet, a security list allowing SSH and HTTP, and a compute instance running Ubuntu 24.04. A [cloud-init script](scripts/userdata.sh) installs Apache when the instance boots.
-
-See it in action — full deployment walkthrough below.
+The companion project to the OCI + Terraform setup video. It shows how to
+give the OCI CLI and Terraform an API signing key, then proves the setup
+works by building the smallest useful thing: a VCN with one public subnet and
+an Ubuntu instance running Apache.
 
 [![Watch the video](https://img.youtube.com/vi/yu190JktZr0/maxresdefault.jpg)](https://www.youtube.com/watch?v=yu190JktZr0)
 
-## Download this Repository
+| Piece | Where | Role |
+|---|---|---|
+| **setup-instance** | `setup-subnet` (10.0.1.0/24) | `VM.Standard.E2.1.Micro` (Always Free eligible), Canonical's newest Ubuntu 24.04 platform image; cloud-init installs Apache; public IP |
+| **setup-vcn** | us-ashburn-1 | 10.0.0.0/16, with `setup-igw` and a route table for the subnet |
+| **setup-security-list** | `setup-subnet` | 22 and 80 from anywhere |
+| **SSH key** | `keys/Private_Key` | an ECDSA key pair Terraform generates on each fresh deploy; `keys/` is gitignored |
 
-```bash
-git clone https://github.com/mamonaco1973/oci-setup.git
-cd oci-setup
-```
+## Architecture
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="architecture-dark.svg">
+  <img alt="Terraform generates an ECDSA SSH key and launches setup-instance, a VM.Standard.E2.1.Micro, from Canonical's newest Ubuntu 24.04 platform image into setup-subnet of setup-vcn, behind an internet gateway, with a security list for SSH and HTTP. Its cloud-init script installs Apache. A browser reaches it over HTTP and an SSH client on port 22." src="architecture-light.svg">
+</picture>
+
+Regenerate with `python3 make_diagram.py`.
+
+Everything is in `main.tf`. `scripts/userdata.sh` waits for IPv4 internet,
+points apt at `us.archive.ubuntu.com`, installs and starts Apache, and opens
+port 80 in the image's iptables rules, which block it by default.
+
+## Give Terraform access to OCI
+
+You need an OCI account; the [Free Tier](https://www.oracle.com/cloud/free/)
+(Always Free) is enough for this project.
+
+1. **API signing key**: in the OCI Console, open the **Profile** menu
+   (top right) > **My profile** > **Tokens and keys** > **Add API key** >
+   **Generate API key pair**. Download the private key as
+   `~/.oci/oci_api_key.pem` and choose **Add**.
+2. **CLI config**: OCI then shows a configuration file preview. Paste it
+   into `~/.oci/config` and point `key_file` at the key:
+
+   ```
+   [DEFAULT]
+   user=ocid1.user.oc1..aaaa...
+   fingerprint=xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx
+   tenancy=ocid1.tenancy.oc1..aaaa...
+   region=us-ashburn-1
+   key_file=~/.oci/oci_api_key.pem
+   ```
+
+   ```bash
+   chmod 600 ~/.oci/config ~/.oci/oci_api_key.pem
+   oci os ns get     # prints your Object Storage namespace if it works
+   ```
+
+3. **Compartment**: use the root compartment (its OCID is your tenancy
+   OCID), or create one under **Identity & Security > Compartments** and copy
+   its OCID. Then:
+
+   ```bash
+   export OCI_COMPARTMENT_ID="ocid1.compartment.oc1..aaaa..."
+   ```
+
+   If it's unset, `apply.sh` and `destroy.sh` use the tenancy OCID from
+   `~/.oci/config`.
 
 ## Prerequisites
 
 * [Install OCI CLI](https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm)
-* [Install Latest Terraform](https://developer.hashicorp.com/terraform/install)
-* [Install Latest Packer](https://developer.hashicorp.com/packer/install)
+* [Install Terraform](https://developer.hashicorp.com/terraform/install)
+* [Install Packer](https://developer.hashicorp.com/packer/install)
 
-NOTE: Make sure the `oci`, `packer`, and `terraform` commands are all in your `$PATH`.
+`check_env.sh` checks that `oci`, `packer` and `terraform` are on your `PATH`
+(Packer isn't used here, but the later projects need it) and that the OCI
+CLI can connect.
 
-The [check_env](./check_env.sh) script validates this when you run the build.
-
-## OCI Account Setup
-
-You need an OCI account. The [OCI Free Tier](https://www.oracle.com/cloud/free/) (Always Free) works fine for this example.
-
-### 1. Create an API Signing Key
-
-OCI uses API key-based authentication instead of username/password for CLI and Terraform access.
-
-1. Click the **Profile** icon (top-right) → **Identity domain: Default**.
-2. In the left sidebar click **My profile**.
-3. Click the **Tokens and keys** tab.
-4. Click **Add API key**.
-4. Select **Generate API key pair**.
-5. Click **Download private key** — save the `.pem` file as `~/.oci/oci_api_key.pem`.
-6. Click **Add**.
-7. OCI will show you a **Configuration file preview** — copy the entire snippet. It looks like this:
-
-```
-[DEFAULT]
-user=ocid1.user.oc1..aaaa...
-fingerprint=xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx
-tenancy=ocid1.tenancy.oc1..aaaa...
-region=us-ashburn-1
-key_file=~/.oci/oci_api_key.pem
-```
-
-### 2. Configure the OCI CLI
-
-Create the config directory and paste the snippet:
+## Deploy
 
 ```bash
-mkdir -p ~/.oci
-# Paste the snippet from step 7 above into this file
-nano ~/.oci/config
+git clone https://github.com/mamonaco1973/oci-setup.git
+cd oci-setup
+./apply.sh
 ```
 
-Restrict permissions on both files (Linux/Mac only):
+The instance is created in `us-ashburn-1`, in the first availability
+domain. `apply.sh` ends by running `validate.sh`, which waits up to 12
+minutes for Apache to answer:
+
+```
+================================================================================
+  OCI Setup - Instance Validated
+================================================================================
+  URL : http://203.0.113.10
+================================================================================
+```
+
+## Try it
+
+1. Open the URL: Apache's test page.
+
+   ![Apache test page](apache.png)
+
+2. SSH in with the generated key:
+
+   ```bash
+   ssh -i ./keys/Private_Key ubuntu@<instance_public_ip>
+   ```
+
+## Teardown
 
 ```bash
-chmod 600 ~/.oci/config
-chmod 600 ~/.oci/oci_api_key.pem
+./destroy.sh
 ```
 
-Verify the CLI works:
+## Notes
 
-```bash
-oci os ns get
-```
-
-You should see your Object Storage namespace returned as JSON. If this fails, double-check the `key_file` path in `~/.oci/config` and that the private key file exists there.
-
-### 3. Get Your Compartment OCID
-
-Everything in OCI lives in a **compartment**. The root compartment is your tenancy itself. For this example you can use the root compartment OCID (same as your Tenancy OCID from step 1), or create a dedicated compartment:
-
-**Option A — Use the root compartment (simplest):**
-Your compartment OCID is the same as your Tenancy OCID copied in step 1.
-
-**Option B — Create a new compartment:**
-1. In the OCI Console, open the navigation menu → **Identity & Security** → **Compartments**.
-2. Click **Create Compartment**.
-3. Give it a name (e.g., `terraform-demo`) and click **Create**.
-4. Click the new compartment and copy its **OCID**.
-
-### 4. Set the Compartment OCID Environment Variable
-
-```bash
-export OCI_COMPARTMENT_ID="ocid1.compartment.oc1..aaaa..."
-```
-
-Add this to your shell profile (`.bashrc` or `.zshrc`) to make it permanent. The apply and destroy scripts translate this into the `TF_VAR_compartment_ocid` name that Terraform expects.
-
-## Run the "apply" Script
-
-```bash
-~/oci-setup$ ./apply.sh
-NOTE: Validating that required commands are found in your PATH.
-NOTE: oci is found in the current PATH.
-NOTE: packer is found in the current PATH.
-NOTE: terraform is found in the current PATH.
-NOTE: All required commands are available.
-NOTE: Checking TF_VAR_compartment_ocid environment variable.
-NOTE: TF_VAR_compartment_ocid is set.
-NOTE: Checking OCI CLI connection.
-NOTE: Successfully connected to OCI.
-Initializing the backend...
-Initializing provider plugins...
-- Finding oracle/oci versions matching "~> 6.0"...
-- Installing oracle/oci v6.x.x...
-
-Terraform has been successfully initialized!
-[...]
-```
-
-## Test the Build
-
-Once built, a single compute instance called `setup-instance` will be created and publicly accessible. Terraform outputs the public IP address.
-
-SSH to the instance with the private key:
-
-```bash
-ssh -i ./keys/Private_Key ubuntu@<instance_public_ip>
-```
-
-Open a browser to `http://<instance_public_ip>` to confirm Apache is running. Apache installation runs on first boot via cloud-init — **allow up to 5 minutes** for it to complete.
-
-![architecture diagram](apache.png)
-
-## Run the "destroy" Script When You Are Done
-
-```bash
-~/oci-setup$ ./destroy.sh
-```
-
-This tears down all Terraform-managed resources. Always run this when finished to avoid unexpected charges.
+- **Lab only.** SSH and HTTP are open to the internet. Restrict
+  `setup-security-list` for anything more.
